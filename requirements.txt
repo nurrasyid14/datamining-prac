@@ -1,0 +1,13 @@
+numpy
+pandas
+scikit-learn
+scikit-fuzzy
+nltk
+Sastrawi
+tensorflow
+spacy
+keras
+openpyxl
+matplotlib
+seaborn
+plotly
