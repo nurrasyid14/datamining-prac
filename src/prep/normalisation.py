@@ -49,6 +49,13 @@ class Normalisation:
                 raise ValueError("Invalid method")
 
     def transform(self, data: pd.DataFrame):
+        if self.numeric_cols is None:
+            raise RuntimeError("Call fit() before transform().")
+
+        missing = set(self.numeric_cols) - set(data.columns)
+        if missing:
+            raise ValueError(f"Missing columns in transform: {missing}")
+
         df = data.copy()
 
         if self.use_scikit:
@@ -79,7 +86,7 @@ class Normalisation:
                 std = self.std_[col]
 
                 if std == 0:
-                    z = 0
+                    z = pd.Series(0, index=df.index)
                 else:
                     z = (df[col] - mean) / std
 

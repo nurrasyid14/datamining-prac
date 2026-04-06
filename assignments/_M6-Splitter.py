@@ -2,68 +2,94 @@ import pathlib
 import pandas as pd
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from src.prep.splitter import Splitter
 from src.prep.data_eng import Validator, Filler
 from src.prep.normalisation import Normalisation
 from src.metrics.classification_metrics import ClassificationMetrics
 from src.classification.knn import KNN
 
+#===========================================================================
 
-# Block 1 : Data Prep
-data = pathlib.Path(__file__).parent.parent / 'data/titanic.csv'
-data = pd.read_csv(data)
-print(data.head())
+# Block 1 : Data Loading
+path = pathlib.Path(__file__).parent.parent / "data" / "titanic.csv"
+data = pd.read_csv(path)
 
-# Block 2 : Data Engineering & Normalisation -- Titanic[Sex, Age, Pclass, Fare]
+print("=== Block 1: Raw Data Preview ===")
+print(data.head(), "\n")
 
-# fill age with mean of the classes
-filler = Filler(data, method="mean")
-filled_df = filler.fill()
-age = filled_df['Age']
-print(f"Filled Age with mean: {age.mean()}")
+# Block 2 : Data Cleaning & Encoding
+data['Sex'] = data['Sex'].map({'male': 0, 'female': 1})
+data = data.drop(columns=['PassengerId', 'Name', 'Ticket', 'Cabin'])
 
-# Label : Survived
+print("=== Block 2: After Encoding & Dropping Columns ===")
+print(data.head(), "\n")
+
+# Block 3 : Missing Value Handling
+data = Filler(data, method="mean").fill()
+
+print("=== Block 3: Missing Values Filled ===")
+print("Remaining NaNs per column:")
+print(data.isnull().sum(), "\n")
+
+# Block 4 : Distribusi Label
 survived, died = data['Survived'].value_counts()
-print(f"Survived: {survived}, Died: {died}")
+print("=== Block 4: Label Distribution ===")
+print(f"Survived: {survived}, Died: {died}\n")
 
-# Block 3 : Data Splitting
-splitter = Splitter(data, train_ratio=0.7, test_ratio=0.2, val_ratio=0.1)
-holdout_train, holdout_test, holdout_val = splitter.holdout(random_state=42)
-kfolds = splitter.k_fold(random_state=42)
-loo = splitter.LoO()
+# Block 5 : Data Splitting
+splitter = Splitter(data, 0.7, 0.2, 0.1)
+train, test, val = splitter.holdout(random_state=42)
 
-# Block 4 : Normalisation
-normaliser = Normalisation(data)
+print("=== Block 5: Data Split Sizes ===")
+print(f"Train: {len(train)}, Test: {len(test)}, Val: {len(val)}\n")
 
-# on train set
-normalised_data = normaliser.min_max()
-# on test set
-normalised_test = normaliser.min_max(holdout_test)
+# Block 6 : Normalisasi
+normaliser = Normalisation(method="minmax")
+normaliser.fit(train)
 
-# Block 5a : KNN Classification on train set
+train = normaliser.transform(train)
+test = normaliser.transform(test)
+
+print("=== Block 6: Normalisation Applied ===")
+print("Train sample:")
+print(train.head(), "\n")
+
+# Block 7 : Feature Selection
 features = ['Sex', 'Age', 'Pclass', 'Fare']
-X = normalised_data[features]
-y = normalised_data['Survived']
 
-knn = KNN(data=normalised_data, target='Survived', k=5)
-knn.split()
-knn.train()
-predictions = knn.predict()
-print(f"Predictions: {predictions[:10]}")
- 
-# Block 5b : KNN Classification on test set
-X_test = normalised_test[features]
-y_test = normalised_test['Survived']
-knn_test = KNN(data=normalised_test, target='Survived', k=5)
-knn_test.split()
-knn_test.train()
-test_predictions = knn_test.predict()
-print(f"Test Predictions: {test_predictions[:10]}")
+X_train = train[features]
+y_train = train['Survived']
 
-# Block 6 : Metrics
-metrics = ClassificationMetrics(y_test, test_predictions)
-accuracy = metrics.accuracy()
-precision = metrics.precision()
-recall = metrics.recall()
-f1 = metrics.f1_score()
-print(f"Accuracy: {accuracy}, Precision: {precision}, Recall: {recall}, F1 Score: {f1}")
+X_test = test[features]
+y_test = test['Survived']
+
+print("=== Block 7: Features & Target ===")
+print(f"Features: {features}")
+print(f"X_train shape: {X_train.shape}, X_test shape: {X_test.shape}\n")
+
+# Block 8 : KNN Training
+knn = KNN(k=5)
+knn.fit(X_train, y_train)
+
+print("=== Block 8: Model Training Completed ===\n")
+
+# Block 9 : Prediction
+preds = knn.predict(X_test)
+
+print("=== Block 9: Predictions Sample ===")
+print(preds[:10], "\n")
+
+# Block 10 : Evaluation Metrics
+metrics = ClassificationMetrics()
+
+accuracy = metrics.accuracy(y_test, preds)
+precision = metrics.precision(y_test, preds)
+recall = metrics.recall(y_test, preds)
+f1 = metrics.f1(y_test, preds)
+
+print("=== Block 10: Evaluation Metrics ===")
+print(f"Accuracy : {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall   : {recall:.4f}")
+print(f"F1 Score : {f1:.4f}")
