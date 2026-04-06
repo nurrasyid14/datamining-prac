@@ -2,7 +2,6 @@ from src.prep.data_eng import Validator, Filler
 from src.prep.normalisation import Normalisation
 from src.metrics.classification_metrics import ClassificationMetrics
 from src.classification.knn import KNN
-from sklearn.model_selection import train_test_split
 import pandas as pd
 
 '''

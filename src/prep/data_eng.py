@@ -120,8 +120,10 @@ class Validator:
 
 
 class Filler:
-    def __init__(self, data: pd.DataFrame):
+    def __init__(self, data: pd.DataFrame, method: str = "mean", group_by=None):
         self.data = data.copy()
+        self.method = method
+        self.group_by = group_by
 
     def _get_fill_value(self, series, method: str):
         if pd.api.types.is_numeric_dtype(series):
@@ -138,15 +140,20 @@ class Filler:
         else:
             return series.mode().iloc[0]
 
-    def fill(self, method: str = "mean"):
+    def fill(self):
         df = self.data.copy()
 
         for col in df.columns:
             if df[col].isnull().sum() == 0:
                 continue
 
-            value = self._get_fill_value(df[col], method)
-            df[col] = df[col].fillna(value)
+            if self.group_by:
+                df[col] = df.groupby(self.group_by)[col].transform(
+                    lambda x: x.fillna(self._get_fill_value(x, self.method))
+                )
+            else:
+                value = self._get_fill_value(df[col], self.method)
+                df[col] = df[col].fillna(value)
 
         return df
 
